@@ -3,7 +3,7 @@ using Printf
 using JLD2
 
 # ==============================================================================
-# run_model_fe.jl  —  TLUSTY + SYNSPEC: NLTE model atmospheres up to Fe (Z≤26)
+# run_model.jl  —  TLUSTY + SYNSPEC: NLTE model atmospheres up to Fe (Z≤26)
 #
 # USAGE:
 #   Grid mode  : julia run_model_fe.jl -g tlusty-input.dat -l 3
