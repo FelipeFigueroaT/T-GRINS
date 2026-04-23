@@ -58,17 +58,6 @@ export IRON=/path/to/irondata          # Kurucz iron superline data
 export OPTABLES=/path/to/optables
 ```
 
-SYNSPEC must be compiled with enlarged internal arrays to handle the dense far-UV line list. In `synspec/LINDAT.FOR`:
-```fortran
-PARAMETER (MLIN0 = 3000000,
-           MLIN  =  500000)
-```
-Then recompile:
-```bash
-cd $TLUSTY/synspec
-gfortran -fno-automatic -mcmodel=large -O3 -o synspec.exe synspec54.f
-```
-
 ### Julia packages
 ```bash
 julia -e 'using Pkg; Pkg.add(["JLD2", "CodecZlib", "TOML"])'
