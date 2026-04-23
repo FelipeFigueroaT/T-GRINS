@@ -1,0 +1,31 @@
+##################################################################
+##
+##         TLUSTY retry grid — Condor submit file
+##         Retry failed models using neighbor as starting point
+##
+##################################################################
+
+Executable = retry_wrapper.sh
+Arguments  = $(Process)
+Universe   = vanilla
+
+Requirements = (Machine == "cak.local") || (Machine == "stellarwind.local")
+
+Should_transfer_files = NO
+
+# getenv=True propaga las variables de entorno del usuario que hace
+# el submit al proceso en el nodo de cómputo. Es un respaldo adicional
+# al export explícito del wrapper, útil para variables como PATH.
+getenv           = True
+
+Initialdir = /home/ffigueroa/nas/Codes/Tlusty/T208/tl208-s54/Grid_SiFe_GAL
+
+Output = Out/retry_$(Process).out
+Error  = Error/retry_$(Process).err
+Log    = retry_condor.log
+
+Notify_user  = felipe.figueroat@postgrado.uv.cl
+Notification = Error
+
+# Update this number with the output of: wc -l retry-input.dat
+queue 75

@@ -1,0 +1,25 @@
+# tlusty-input_example.dat — Example input file for T-GRINS
+# Format: Teff [K]   logg [cgs]   Z [optional, relative to solar]
+#
+# This file contains a small representative sample of the SiFe GAL grid.
+# To run the full grid, replace with your complete tlusty-input.dat.
+#
+# Column 1: Effective temperature [K]
+# Column 2: Log surface gravity [cm/s²]
+# Column 3: Metallicity Z relative to solar (optional, default = Z_SOLAR in script)
+#
+# --- B-stars (Teff < 30000 K) ---
+25000.0   4.30
+25000.0   3.00
+27500.0   3.50
+29500.0   4.00
+# --- O-stars (Teff >= 30000 K) ---
+30000.0   4.30
+35000.0   4.00
+40000.0   3.80
+45000.0   4.10
+50000.0   4.30
+# --- Multi-metallicity example (uncomment to use) ---
+# 35000.0   4.00   1.0
+# 35000.0   4.00   0.5
+# 35000.0   4.00   0.2

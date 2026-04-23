@@ -1,0 +1,31 @@
+##################################################################
+##
+##         TLUSTY grid — Condor submit file
+##         Grilla con elementos hasta Fe (Z≤26)
+##
+##################################################################
+
+Executable       = run_wrapper.sh
+Arguments        = $(Process)
+Universe         = vanilla
+
+Requirements     = (Machine == "cak.local") || (Machine == "stellarwind.local")
+
+Should_transfer_files   = NO
+
+# getenv=True propaga las variables de entorno del usuario que hace
+# el submit al proceso en el nodo de cómputo. Es un respaldo adicional
+# al export explícito del wrapper, útil para variables como PATH.
+getenv           = True
+
+Initialdir       = /home/ffigueroa/nas/Codes/Tlusty/T208/tl208-s54/Grid_SiFe_GAL
+
+Output           = Out/tlusty_$(Process).out
+Error            = Error/tlusty_$(Process).err
+Log              = tlusty_condor.log
+
+Notify_user      = felipe.figueroat@postgrado.uv.cl
+Notification     = Error
+
+# Verificar con: wc -l tlusty-input_01.dat
+queue 626

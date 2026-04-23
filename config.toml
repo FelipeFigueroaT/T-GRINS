@@ -1,0 +1,102 @@
+# ==============================================================================
+# config.toml — Configuration file for run_model_fe.jl (single model mode)
+#
+# Usage: julia run_model_fe.jl -c config.toml
+#
+# Only [model].teff and [model].logg are required.
+# All other fields are optional — remove or comment out to use the defaults.
+# ==============================================================================
+
+# ------------------------------------------------------------------------------
+# MODEL — stellar parameters
+# ------------------------------------------------------------------------------
+[model]
+teff = 35000.0   # effective temperature [K], range: 25000–50000
+logg = 4.0       # log surface gravity [cm/s²], range: 2.5–4.3
+
+# ------------------------------------------------------------------------------
+# ABUNDANCES
+#
+# Z scales all metals heavier than He relative to solar (Asplund et al. 2009).
+# Useful presets:
+#   Z = 1.0  → solar / Milky Way
+#   Z = 0.5  → LMC
+#   Z = 0.2  → SMC
+#
+# Individual elements can be set separately (also relative to solar = 1.0).
+# These override Z for that specific element.
+# He is not affected by Z — it must be set explicitly if you want to change it.
+# H is always fixed at 1.
+# ------------------------------------------------------------------------------
+[abundances]
+Z  = 1.0    # global metal scaling (all elements with Z > 2)
+# he = 1.0  # helium abundance relative to solar
+# c  = 1.0  # carbon
+# n  = 1.0  # nitrogen
+# o  = 1.0  # oxygen
+# si = 1.0  # silicon
+# fe = 1.0  # iron — useful for studying iron-group opacity effects
+
+# ------------------------------------------------------------------------------
+# TLUSTY — atmospheric model convergence
+#
+# These are the standard values used for the SiFe GAL grid.
+# You probably do not need to change these for normal use.
+#
+# nlambd : number of accelerated lambda iterations (ALI) per global step.
+#          Higher values give more accurate NLTE level populations.
+#          Default = 8 (grid standard). Use 3 for convergence-difficult models.
+# chmax  : convergence criterion. The model is considered converged when the
+#          maximum relative change in all quantities falls below this value.
+#          Default = 1e-5. Use 1e-3 for a faster, less precise run.
+# itek   : global iteration after which Kantorovich acceleration activates.
+# iacc   : global iteration after which Ng acceleration activates.
+#          Setting both > 50 disables acceleration entirely (safer for
+#          near-Eddington models but slower).
+# vtb    : microturbulent velocity [km/s].
+#          Default: 2.0 for B-stars (Teff < 30000 K), 10.0 for O-stars.
+# ------------------------------------------------------------------------------
+[tlusty]
+nd     = 50       # number of depth points in the atmosphere
+nlambd = 8        # lambda iterations per step
+chmax  = 1.0e-5   # convergence criterion
+itek   = 15       # iteration to activate Kantorovich acceleration
+iacc   = 10       # iteration to activate Ng acceleration
+ielcor = -1       # electron temperature correction (-1 = disabled, recommended)
+# vtb  = 10.0     # microturbulence [km/s] — uncomment to override auto selection
+
+# ------------------------------------------------------------------------------
+# SYNSPEC — spectrum synthesis
+#
+# segments: defines the wavelength ranges for spectrum calculation.
+#   Each segment is [start_Å, end_Å, relop].
+#   A negative end_Å means vacuum wavelengths (recommended).
+#   relop controls how many spectral lines are included: smaller = more lines
+#   but more memory. 1e-4 is the standard; 1e-2 is used below 900 Å to avoid
+#   memory overflow from the extremely dense UV line list.
+#
+# Default segments used in the grid:
+#   O-stars: two segments to handle the dense far-UV line list
+#     - 50–900 Å with relop=1e-2 (EUV, fewer lines loaded)
+#     - 900–50000 Å with relop=1e-4 (UV to near-IR, full line list)
+#   B-stars: one segment
+#     - 500–50000 Å with relop=1e-4
+# ------------------------------------------------------------------------------
+[synspec]
+sp_cutof = 0.01   # line wing cutoff: lines are dropped beyond this fraction
+                  # of the Doppler width from line center
+# segments = [[50.0, -900.0, 1.0e-2], [900.0, -50000.0, 1.0e-4]]
+# Uncomment and edit segments above to use a custom wavelength range.
+# Example — optical only: segments = [[3500.0, -9000.0, 1.0e-4]]
+
+# ------------------------------------------------------------------------------
+# OUTPUT
+#
+# step_ang : wavelength step of the output grid saved in the JLD2 file [Å].
+#            0.5 Å is the grid standard. Use 1.0 for smaller files.
+# keep_ascii: if true, keeps the raw SYNSPEC output files (mod_sp.spec,
+#             mod_sp.cont) in addition to the JLD2. Useful for debugging.
+# ------------------------------------------------------------------------------
+[output]
+step_ang   = 0.5    # output wavelength step [Å]
+keep_ascii = false  # keep raw SYNSPEC ASCII output
