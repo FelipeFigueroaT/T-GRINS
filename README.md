@@ -20,7 +20,7 @@ T-GRINS/
 ├── config.toml           — Template for single-model mode
 │
 ├── pipeline/
-│   ├── run_model_fe.jl   — Main pipeline (grid or single mode)
+│   ├── run_model.jl   — Main pipeline (grid or single mode)
 │   ├── run_wrapper.sh    — HTCondor wrapper
 │   ├── tlusty_grid.sub   — HTCondor submit file
 │   ├── run_retry.jl      — Retry pipeline for difficult models
