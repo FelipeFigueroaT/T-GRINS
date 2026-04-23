@@ -49,7 +49,7 @@ T-GRINS/
 ## Requirements
 
 ### TLUSTY and SYNSPEC
-Download TLUSTY 208 + SYNSPEC 54 from http://tlusty.oca.eu/ and set the following environment variables:
+Download TLUSTY 208 + SYNSPEC 54 from [TLUSTY page](https://www.as.arizona.edu/~hubeny/tlusty208-package/) and set the following environment variables:
 
 ```bash
 export TLUSTY=/path/to/tl208-s54
