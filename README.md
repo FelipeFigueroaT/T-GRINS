@@ -7,7 +7,7 @@
 
 T-GRINS is a pipeline for computing NLTE model atmosphere grids of OB stars using [TLUSTY 208](http://tlusty.oca.eu/) and SYNSPEC 54, with HTCondor for parallel execution.
 
-The pipeline produces one JLD2 file per model containing the full SED (spectrum + continuum) from the UV to the near-IR, ready for use in stellar population synthesis, mass-loss rate determinations, or photometric modeling.
+The pipeline produces one JLD2 file per model containing the full SED (spectrum + continuum) from the UV to the near-IR.
 
 ---
 
