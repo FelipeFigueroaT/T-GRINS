@@ -22,10 +22,10 @@ T-GRINS/
 ├── pipeline/
 │   ├── run_model.jl   — Main pipeline (grid or single mode)
 │   ├── run_wrapper.sh    — HTCondor wrapper
-│   ├── tlusty_grid.sub   — HTCondor submit file
+│   ├── run_grid.submit   — HTCondor submit file
 │   ├── run_retry.jl      — Retry pipeline for difficult models
 │   ├── retry_wrapper.sh  — HTCondor wrapper for retry
-│   └── retry_grid.sub    — HTCondor submit file for retry
+│   └── retry_grid.submit    — HTCondor submit file for retry
 │
 ├── tools/
 │   ├── setup_grid.sh     — Create a ready-to-run grid directory
