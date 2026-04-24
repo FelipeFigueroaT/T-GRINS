@@ -1,31 +1,32 @@
 ##################################################################
 ##
-##         TLUSTY grid — Condor submit file
-##         Grilla con elementos hasta Fe (Z≤26)
+##         T-GRINS — Main grid submit file
+##         NLTE grid with elements up to Fe (Z <= 26)
 ##
 ##################################################################
+Executable = run_wrapper.sh
+Arguments  = $(Process)
+Universe   = vanilla
 
-Executable       = run_wrapper.sh
-Arguments        = $(Process)
-Universe         = vanilla
+# Restrict to nodes with enough memory for SYNSPEC (>= 1.5 GB recommended).
+# Update machine names to match your cluster.
+Requirements = (Machine == "cak.local") || (Machine == "stellarwind.local")
 
-Requirements     = (Machine == "cak.local") || (Machine == "stellarwind.local")
+Should_transfer_files = NO
 
-Should_transfer_files   = NO
+# getenv=True propagates the submitting user's environment variables
+# (TLUSTY, IRON, LINELIST, OPTABLES, PATH) to the worker node.
+getenv = True
 
-# getenv=True propaga las variables de entorno del usuario que hace
-# el submit al proceso en el nodo de cómputo. Es un respaldo adicional
-# al export explícito del wrapper, útil para variables como PATH.
-getenv           = True
+# Update this path to your working grid directory.
+Initialdir = /path/to/Grid_SiFe_GAL
 
-Initialdir       = /home/ffigueroa/nas/Codes/Tlusty/T208/tl208-s54/Grid_SiFe_GAL
+Output = Out/tlusty_$(Process).out
+Error  = Error/tlusty_$(Process).err
+Log    = tlusty_condor.log
 
-Output           = Out/tlusty_$(Process).out
-Error            = Error/tlusty_$(Process).err
-Log              = tlusty_condor.log
+Notify_user  = felipe.figueroat@postgrado.uv.cl
+Notification = Error
 
-Notify_user      = felipe.figueroat@postgrado.uv.cl
-Notification     = Error
-
-# Verificar con: wc -l tlusty-input_01.dat
+# Update this number with the output of: wc -l tlusty-input.dat
 queue 626
