@@ -1,24 +1,25 @@
 ##################################################################
 ##
-##         TLUSTY retry grid — Condor submit file
-##         Retry failed models using neighbor as starting point
+##         T-GRINS — Retry grid submit file
+##         Retry failed models using a neighbor as starting point
 ##
 ##################################################################
-
 Executable = retry_wrapper.sh
 Arguments  = $(Process)
 Universe   = vanilla
 
+# Restrict to nodes with enough memory for SYNSPEC (>= 1.5 GB recommended).
+# Update machine names to match your cluster.
 Requirements = (Machine == "cak.local") || (Machine == "stellarwind.local")
 
 Should_transfer_files = NO
 
-# getenv=True propaga las variables de entorno del usuario que hace
-# el submit al proceso en el nodo de cómputo. Es un respaldo adicional
-# al export explícito del wrapper, útil para variables como PATH.
-getenv           = True
+# getenv=True propagates the submitting user's environment variables
+# (TLUSTY, IRON, LINELIST, OPTABLES, PATH) to the worker node.
+getenv = True
 
-Initialdir = /home/ffigueroa/nas/Codes/Tlusty/T208/tl208-s54/Grid_SiFe_GAL
+# Update this path to your working grid directory.
+Initialdir = /path/to/Grid
 
 Output = Out/retry_$(Process).out
 Error  = Error/retry_$(Process).err
