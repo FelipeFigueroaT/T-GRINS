@@ -33,16 +33,16 @@ echo "============================================================"
 
 # --- Required files (relative to repo root) ---
 REQUIRED=(
-    "pipeline/run_model_fe.jl"
+    "pipeline/run_model.jl"
     "pipeline/run_wrapper.sh"
-    "pipeline/tlusty_grid.sub"
+    "pipeline/run_grid.submit"
     "pipeline/run_retry.jl"
     "pipeline/retry_wrapper.sh"
-    "pipeline/retry_grid.sub"
+    "pipeline/retry_grid.submit"
     "tools/make_retry_list.jl"
     "tools/check_grid.jl"
     "tools/check_retry.jl"
-    "tools/collect_jld2.jl"
+    "tools/collect_flux_jld2.jl"
     "config.toml"
 )
 
@@ -87,10 +87,10 @@ chmod +x "$TARGET_DIR/run_wrapper.sh"
 chmod +x "$TARGET_DIR/retry_wrapper.sh"
 
 # --- Update Initialdir in Condor submit files ---
-sed -i "s|^Initialdir.*|Initialdir = $TARGET_DIR|" "$TARGET_DIR/tlusty_grid.sub"
-sed -i "s|^Initialdir.*|Initialdir = $TARGET_DIR|" "$TARGET_DIR/retry_grid.sub"
+sed -i "s|^Initialdir.*|Initialdir = $TARGET_DIR|" "$TARGET_DIR/run_grid.submit"
+sed -i "s|^Initialdir.*|Initialdir = $TARGET_DIR|" "$TARGET_DIR/retry_grid.submit"
 echo ""
-echo "Updated Initialdir in tlusty_grid.sub and retry_grid.sub"
+echo "Updated Initialdir in run_grid.submit and retry_grid.submit"
 
 # --- Instructions ---
 echo ""
@@ -103,11 +103,11 @@ echo ""
 echo "  2. Copy your input file:"
 echo "     cp tlusty-input.dat $TARGET_DIR/"
 echo ""
-echo "  3. Set queue count in tlusty_grid.sub:"
+echo "  3. Set queue count in run_grid.submit:"
 echo "     wc -l $TARGET_DIR/tlusty-input.dat"
 echo ""
 echo "  4. Submit:"
-echo "     cd $TARGET_DIR && condor_submit tlusty_grid.sub"
+echo "     cd $TARGET_DIR && condor_submit run_grid.submit"
 echo ""
 echo "  5. After completion:"
 echo "     julia check_grid.jl"
