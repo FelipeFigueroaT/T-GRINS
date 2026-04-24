@@ -1,75 +1,72 @@
 #!/bin/bash
 # ==============================================================================
-# run_wrapper.sh — Wrapper para Condor (TLUSTY + Julia, grilla con Fe)
+# run_wrapper.sh — HTCondor wrapper for T-GRINS (TLUSTY + SYNSPEC grid)
 #
-# Las variables TLUSTY, IRON, LINELIST, OPTABLES vienen del .bashrc del usuario
-# y se propagan a Condor mediante 'getenv = True' en el submit file.
-# Este wrapper las verifica, agrega ajustes de performance, y propaga
-# correctamente el exit code de Julia a Condor.
+# Environment variables TLUSTY, IRON, LINELIST, and OPTABLES must be defined
+# in the user's .bashrc and propagated to Condor via 'getenv = True' in the
+# submit file.
 # ==============================================================================
-
 set -euo pipefail
 
 # ==============================================================================
-# 1. VERIFICAR VARIABLES DE ENTORNO (vienen de .bashrc via getenv=True)
+# 1. CHECK ENVIRONMENT VARIABLES
 # ==============================================================================
 for var in TLUSTY IRON LINELIST; do
     if [ -z "${!var:-}" ]; then
-        echo "ERROR: Variable de entorno '$var' no definida."
-        echo "       Verificá que tu .bashrc la exporte y que el submit tenga 'getenv = True'."
+        echo "ERROR: Environment variable '$var' is not defined."
+        echo "       Make sure your .bashrc exports it and the submit file has 'getenv = True'."
         exit 1
     fi
 done
 
 # ==============================================================================
-# 2. AJUSTES DE PERFORMANCE (siempre necesarios, no vienen del .bashrc)
+# 2. PERFORMANCE SETTINGS
 # ==============================================================================
-# TLUSTY es single-threaded. Sin esto, Julia/BLAS puede spawnear threads
-# que compiten con otros jobs en el mismo nodo.
+# TLUSTY is single-threaded. Without these settings, Julia/BLAS may spawn
+# threads that compete with other jobs running on the same node.
 export OMP_NUM_THREADS=1
 export JULIA_NUM_THREADS=1
 export OPENBLAS_NUM_THREADS=1
 export MKL_NUM_THREADS=1
 
-# TLUSTY 208 necesita stack ilimitado: sus COMMON blocks pueden superar
-# el límite de 8 MB por defecto, causando segfault silencioso en el nodo.
+# TLUSTY 208 requires an unlimited stack: its COMMON blocks can exceed
+# the default 8 MB limit, causing a silent segfault on the worker node.
 ulimit -s unlimited
 
 # ==============================================================================
-# 3. ÍNDICE DE FILA
+# 3. ROW INDEX
 # ==============================================================================
-# Condor pasa $(Process) que arranca en 0, pero tlusty-input_01.dat
-# arranca en fila 1.
+# Condor passes $(Process) starting at 0, but tlusty-input.dat starts at row 1.
 PROCESS_ID=$1
 ROW=$(( PROCESS_ID + 1 ))
 
 # ==============================================================================
-# 4. LOG DE INICIO
+# 4. START LOG
 # ==============================================================================
 echo "============================================================"
 echo " TLUSTY Job — $(date)"
-echo " Nodo        : $(hostname)"
-echo " Proceso     : $PROCESS_ID  →  Fila de input: $ROW"
-echo " Directorio  : $(pwd)"
+echo " Node        : $(hostname)"
+echo " Process     : $PROCESS_ID  ->  Input row: $ROW"
+echo " Directory   : $(pwd)"
 echo " TLUSTY      : $TLUSTY"
 echo " IRON        : $IRON"
 echo " LINELIST    : $LINELIST"
-echo " Julia       : $(/share/apps/sistema/julia-1.8/bin/julia --version)"
+echo " Julia       : $(julia --version)"
 echo "============================================================"
 
 # ==============================================================================
-# 5. EJECUCIÓN DE JULIA
+# 5. RUN JULIA
 # ==============================================================================
-/share/apps/sistema/julia-1.8/bin/julia run_model_fe.jl "$ROW"
+julia run_model_fe.jl -g tlusty-input.dat -l "$ROW"
 EXIT_CODE=$?
 
 # ==============================================================================
-# 6. LOG DE CIERRE Y EXIT CODE
+# 6. END LOG AND EXIT CODE
 # ==============================================================================
 echo "============================================================"
-echo " Proceso $PROCESS_ID finalizado — $(date)"
-echo " Exit code Julia: $EXIT_CODE"
+echo " Process $PROCESS_ID finished — $(date)"
+echo " Julia exit code: $EXIT_CODE"
 echo "============================================================"
 
-# Sin este exit, Condor siempre ve éxito aunque Julia haya fallado.
+# Without this, Condor always sees success even if Julia failed.
 exit $EXIT_CODE
