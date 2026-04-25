@@ -3,39 +3,46 @@ using Printf
 using JLD2
 
 # ==============================================================================
-# run_model.jl  —  TLUSTY + SYNSPEC: NLTE model atmospheres up to Fe (Z≤26)
+# run_model.jl  —  TLUSTY + SYNSPEC: NLTE model atmospheres for OB stars
 #
 # USAGE:
-#   Grid mode  : julia run_model_fe.jl -g tlusty-input.dat -l 3
-#   Config mode: julia run_model_fe.jl -c config.toml
-#   Quick mode : julia run_model_fe.jl -t 35000 -G 4.0
-#   Legacy     : julia run_model_fe.jl 3   (reads tlusty-input.dat, line 3)
+#   Grid mode  : julia run_model.jl -g tlusty-input.dat -l 3
+#   Config mode: julia run_model.jl -c config.toml
+#   Quick mode : julia run_model.jl -t 35000 -G 4.0
+#   Legacy     : julia run_model.jl 3   (reads tlusty-input.dat, line 3)
 #
-# PIPELINE (5 steps):
-#   mod_lt    LTE gray atmosphere
-#   mod_nc    NLTE continuum, CNO only
-#   mod_nc_fe NLTE continuum + Si+S+Fe (Fe blanketing in LTE superlevel mode)
-#   mod_nl    NLTE full lines, final converged atmosphere
-#   mod_sp    SYNSPEC → detailed SED saved as .jld2
+# COMPOSITIONS:
+#   "H"       — hydrogen only
+#   "HHe"     — H + He
+#   "HHeCNO"  — H + He + C + N + O
+#   "SiFe"    — full grid: H He C N O Si S Fe (default)
+#
+# PIPELINE:
+#   H / HHe / HHeCNO : mod_lt → mod_nc → mod_nl → mod_sp  (3 TLUSTY steps)
+#   SiFe             : mod_lt → mod_nc → mod_nc_fe → mod_nl → mod_sp  (4 steps)
 #
 # ENVIRONMENT VARIABLES REQUIRED:
 #   TLUSTY   — path to tlusty/synspec root
 #   LINELIST — path to line list directory (gfATO.dat / gfATO.bin)
-#   IRON     — path to iron superline data
+#   IRON     — path to iron superline data (SiFe only)
 #
 # DEPENDENCIES:
 #   julia -e 'using Pkg; Pkg.add(["JLD2", "CodecZlib", "TOML"])'
 # ==============================================================================
 
 # ==============================================================================
-# GRID METALLICITY
-# Change Z_SOLAR once to run the full grid at a different metallicity:
-#   Z_SOLAR = 1.0  → Galactic (solar)
-#   Z_SOLAR = 0.5  → LMC
-#   Z_SOLAR = 0.2  → SMC
-# Applied to all metals (Z > 2). H and He are not scaled by Z.
-# In config mode, use the [abundances] section for finer control.
+# GRID CONFIGURATION
+# Change these two constants to run a different grid.
+# They apply to all models in grid mode; in config mode they are overridden.
 # ==============================================================================
+
+# Composition: "H", "HHe", "HHeCNO", or "SiFe"
+const COMPOSITION = "SiFe"
+
+# Metallicity relative to solar (Asplund et al. 2009):
+#   1.0 = Galactic, 0.5 = LMC, 0.2 = SMC
+# Applied to all metals (Z > 2). H and He are not scaled.
+# Only used for SiFe and HHeCNO compositions.
 const Z_SOLAR = 1.0
 
 # Asplund et al. (2009) solar photospheric abundances: log(N/N_H)
@@ -101,10 +108,11 @@ mode, config_file, line_idx, teff_arg, logg_arg = parse_args(ARGS)
 # DEFAULT PARAMETERS (overridden by config or CLI)
 # ==============================================================================
 cfg = Dict{String,Any}(
-    "teff"       => 0.0,
-    "logg"       => 0.0,
-    "Z"          => Z_SOLAR,
-    "abund"      => Dict{String,Float64}(),  # element overrides relative to solar
+    "teff"        => 0.0,
+    "logg"        => 0.0,
+    "Z"           => Z_SOLAR,
+    "composition" => COMPOSITION,
+    "abund"       => Dict{String,Float64}(),  # element overrides relative to solar
     # TLUSTY
     "nd"         => 50,
     "nlambd"     => 8,
@@ -138,6 +146,7 @@ if mode == :config
     cfg["teff"] = Float64(get(m, "teff", 0.0))
     cfg["logg"] = Float64(get(m, "logg", 0.0))
     cfg["Z"]    = Float64(get(m, "Z", Z_SOLAR))
+    cfg["composition"] = get(m, "composition", COMPOSITION)
 
     if cfg["teff"] == 0.0 || cfg["logg"] == 0.0
         println("Error: [model] teff and logg must be specified in $config_file")
@@ -186,9 +195,16 @@ else  # :grid
     cfg["Z"]    = size(data, 2) >= 3 ? Float64(data[line_idx, 3]) : Z_SOLAR
 end
 
-teff = cfg["teff"]
-logg = cfg["logg"]
-Z    = cfg["Z"]
+teff        = cfg["teff"]
+logg        = cfg["logg"]
+Z           = cfg["Z"]
+composition = cfg["composition"]
+
+valid_comps = ["H", "HHe", "HHeCNO", "SiFe"]
+if !(composition in valid_comps)
+    println("Error: Unknown composition '$composition'. Valid options: $(join(valid_comps, ", "))")
+    exit(1)
+end
 
 # ==============================================================================
 # STELLAR TYPE
@@ -199,11 +215,13 @@ star_type     = is_ostar ? "O-Star" : "B-Star"
 vtb_val       = cfg["vtb"] > 0 ? cfg["vtb"] : (is_ostar ? 10.0 : 2.0)
 
 dir_name = "model_$(@sprintf("%.0f_%.0f", teff, logg * 100))"
-Z != 1.0 && (dir_name *= "_Z$(@sprintf("%.2f", Z))")
+composition != "SiFe" && (dir_name *= "_$(composition)")
+Z != 1.0              && (dir_name *= "_Z$(@sprintf("%.2f", Z))")
 
 println("="^60)
 println(" Teff=$(teff) K  logg=$(logg)  Z=$(Z)×solar  $(star_type)  VTB=$(vtb_val) km/s")
-println(" Directory: $dir_name")
+println(" Composition: $composition")
+println(" Directory  : $dir_name")
 println("="^60)
 
 # Skip if already has valid JLD2
@@ -460,18 +478,96 @@ ions_sp_block = """
 """
 
 # ==============================================================================
-# WRITE .5 INPUT FILES
+# WRITE .5 INPUT FILES (composition-aware)
 # ==============================================================================
 name_lt = "mod_lt"; name_nc = "mod_nc"
 name_nc_fe = "mod_nc_fe"; name_nl = "mod_nl"; name_sp = "mod_sp"
 
-for (name, T_T, nst, hdr, ions) in [
-    (name_lt,    "T  T", "param_lt.nst",    header_cno_2k, ions_cno(100)),
-    (name_nc,    "F  F", "param_nc.nst",    header_cno_2k, ions_cno(100)),
-    (name_nc_fe, "F  F", "param_nc_fe.nst", header_fe_50k, ions_fe(100)),
-    (name_nl,    "F  F", "param_nl.nst",    header_fe_50k, ions_fe(0)),
-    (name_sp,    "F  F", "param_sp.nst",    header_fe_50k, ions_sp_block),
-]
+# Select atom headers and ion blocks based on composition
+if composition == "H"
+    # H only: 1 atom, 2000 frequencies
+    header_lt = """
+*-----------------------------------------------------------------
+* frequencies
+ 2000
+*-----------------------------------------------------------------
+* data for atoms
+*
+ 1
+* mode abn modpf
+    2   0.            0     ! H
+*
+*iat   iz   nlevs  ilast ilvlin  nonstd typion  filei
+*"""
+    ions_lt_nl(ilvlin) = """
+   1    0     9      0   $(lpad(ilvlin,4))      0    ' H 1' 'data/h1.dat'
+   1    1     1      1      0          0    ' H 2' ' '
+   0    0     0     -1      0          0    '    ' ' '
+*
+* end
+"""
+    header_sp = header_lt
+    ions_sp_comp = ions_lt_nl(0)
+    files_to_write = [
+        (name_lt, "T  T", "param_lt.nst", header_lt, ions_lt_nl(100)),
+        (name_nc, "F  F", "param_nc.nst", header_lt, ions_lt_nl(100)),
+        (name_nl, "F  F", "param_nl.nst", header_lt, ions_lt_nl(0)),
+        (name_sp, "F  F", "param_sp.nst", header_sp, ions_sp_comp),
+    ]
+
+elseif composition == "HHe"
+    # H + He: 2 atoms (up to He 3), 2000 frequencies
+    header_hhe = """
+*-----------------------------------------------------------------
+* frequencies
+ 2000
+*-----------------------------------------------------------------
+* data for atoms
+*
+ 2
+* mode abn modpf
+    2   0.            0     ! H
+    2   $(rpad(abn[:he],10))0     ! He
+*
+*iat   iz   nlevs  ilast ilvlin  nonstd typion  filei
+*"""
+    ions_hhe(ilvlin) = """
+   1    0     9      0   $(lpad(ilvlin,4))      0    ' H 1' 'data/h1.dat'
+   1    1     1      1      0          0    ' H 2' ' '
+   2    0    24      0   $(lpad(ilvlin,4))      0    'He 1' 'data/he1.dat'
+   2    1    20      0   $(lpad(ilvlin,4))      0    'He 2' 'data/he2.dat'
+   2    2     1      1      0          0    'He 3' ' '
+   0    0     0     -1      0          0    '    ' ' '
+*
+* end
+"""
+    files_to_write = [
+        (name_lt, "T  T", "param_lt.nst", header_hhe, ions_hhe(100)),
+        (name_nc, "F  F", "param_nc.nst", header_hhe, ions_hhe(100)),
+        (name_nl, "F  F", "param_nl.nst", header_hhe, ions_hhe(0)),
+        (name_sp, "F  F", "param_sp.nst", header_hhe, ions_hhe(0)),
+    ]
+
+elseif composition == "HHeCNO"
+    # H + He + C + N + O: same as mod_nc step in SiFe, 2000 frequencies
+    files_to_write = [
+        (name_lt, "T  T", "param_lt.nst", header_cno_2k, ions_cno(100)),
+        (name_nc, "F  F", "param_nc.nst", header_cno_2k, ions_cno(100)),
+        (name_nl, "F  F", "param_nl.nst", header_cno_2k, ions_cno(0)),
+        (name_sp, "F  F", "param_sp.nst", header_cno_2k, ions_cno(0)),
+    ]
+
+else  # "SiFe"
+    files_to_write = [
+        (name_lt,    "T  T", "param_lt.nst",    header_cno_2k, ions_cno(100)),
+        (name_nc,    "F  F", "param_nc.nst",    header_cno_2k, ions_cno(100)),
+        (name_nc_fe, "F  F", "param_nc_fe.nst", header_fe_50k, ions_fe(100)),
+        (name_nl,    "F  F", "param_nl.nst",    header_fe_50k, ions_fe(0)),
+        (name_sp,    "F  F", "param_sp.nst",    header_fe_50k, ions_sp_block),
+    ]
+end
+
+for (name, T_T, nst, hdr, ions) in files_to_write
     open("$name.5", "w") do f
         println(f, "$teff $logg")
         println(f, " $T_T")
@@ -592,26 +688,31 @@ end
 # ==============================================================================
 # TLUSTY PIPELINE
 # ==============================================================================
-println("\nStarting calculations ($star_type)...")
+println("\nStarting calculations ($star_type, $composition)...")
 
-println("\n>> [1/5] LTE (gray atmosphere)...")
+println("\n>> [1] LTE (gray atmosphere)...")
 clean_data_link()
 run(`bash -c "$rtlusty_cmd $name_lt"`)
 check_output(name_lt); check_nan(name_lt)
 
-println("\n>> [2/5] NLTE continuum — CNO...")
+println("\n>> [2] NLTE continuum...")
 clean_data_link()
 run(`bash -c "$rtlusty_cmd $name_nc $name_lt"`)
 check_output(name_nc); check_nan(name_nc)
 
-println("\n>> [3/5] NLTE continuum — Si+S+Fe (Fe blanketing)...")
-clean_data_link()
-run(`bash -c "$rtlusty_cmd $name_nc_fe $name_nc"`)
-check_output(name_nc_fe); check_nan(name_nc_fe)
+if composition == "SiFe"
+    println("\n>> [3] NLTE continuum — Si+S+Fe (Fe blanketing)...")
+    clean_data_link()
+    run(`bash -c "$rtlusty_cmd $name_nc_fe $name_nc"`)
+    check_output(name_nc_fe); check_nan(name_nc_fe)
+    prev_nl = name_nc_fe
+else
+    prev_nl = name_nc
+end
 
-println("\n>> [4/5] NLTE full lines — final converged model...")
+println("\n>> NLTE full lines — final converged model...")
 clean_data_link()
-run(`bash -c "$rtlusty_cmd $name_nl $name_nc_fe"`)
+run(`bash -c "$rtlusty_cmd $name_nl $prev_nl"`)
 clean_data_link()
 check_output(name_nl); check_nan(name_nl)
 
@@ -661,6 +762,30 @@ if length(all_lam_s) < 10000
 end
 
 # ==============================================================================
+# CLEAN RAW SYNSPEC OUTPUT
+# Filter NaN, Inf, and negative flux values before interpolating.
+# These appear mainly in the far-UV where line opacity can go unphysical.
+# ==============================================================================
+function clean_spectrum(lam, hlam, label)
+    valid = isfinite.(hlam) .& (hlam .> 0)
+    n_bad = count(.!valid)
+    if n_bad > 0
+        pct = round(100 * n_bad / length(hlam), digits=2)
+        println("   WARNING: $n_bad invalid points ($pct%) removed from $label before interpolation.")
+    end
+    return lam[valid], hlam[valid]
+end
+
+all_lam_s, all_hlam_s = clean_spectrum(all_lam_s, all_hlam_s, "hlam_spec")
+all_lam_c, all_hlam_c = clean_spectrum(all_lam_c, all_hlam_c, "hlam_cont")
+
+if length(all_lam_s) < 10000
+    println("WARNING: After cleaning, only $(length(all_lam_s)) valid points remain.")
+    println("  The SYNSPEC output is too sparse to produce a valid SED.")
+    cd(".."); exit(1)
+end
+
+# ==============================================================================
 # RESAMPLE AND SAVE JLD2
 # ==============================================================================
 println("\nResampling and compressing SED to JLD2...")
@@ -672,19 +797,31 @@ interp(lam, hlam, λ) = let idx = searchsortedfirst(lam, λ)
     hlam[idx-1] + (hlam[idx]-hlam[idx-1])*(λ-lam[idx-1])/(lam[idx]-lam[idx-1])
 end
 
+hlam_s_out = Float32.([interp(all_lam_s, all_hlam_s, λ) for λ in lam_grid])
+hlam_c_out = Float32.([interp(all_lam_c, all_hlam_c, λ) for λ in lam_grid])
+
 jldsave("$name_sp.jld2"; compress=true,
-    lam       = Float32.(lam_grid),
-    hlam_spec = Float32.([interp(all_lam_s, all_hlam_s, λ) for λ in lam_grid]),
-    hlam_cont = Float32.([interp(all_lam_c, all_hlam_c, λ) for λ in lam_grid]),
-    teff      = Float32(teff),
-    logg      = Float32(logg),
-    Z         = Float32(Z),
-    vtb       = Float32(vtb_val),
-    star_type = star_type,
-    step_ang  = Float32(step_out),
+    lam         = Float32.(lam_grid),
+    hlam_spec   = hlam_s_out,
+    hlam_cont   = hlam_c_out,
+    teff        = Float32(teff),
+    logg        = Float32(logg),
+    Z           = Float32(Z),
+    composition = composition,
+    vtb         = Float32(vtb_val),
+    star_type   = star_type,
+    step_ang    = Float32(step_out),
 )
 
 println("   SYNSPEC points: $(length(all_lam_s)) → resampled: $(length(lam_grid)) (step=$(step_out) Å)")
+
+# Verify no NaN survived interpolation
+n_nan_s = count(isnan, hlam_s_out)
+n_nan_c = count(isnan, hlam_c_out)
+if n_nan_s > 0 || n_nan_c > 0
+    println("   WARNING: $n_nan_s NaN in hlam_spec, $n_nan_c NaN in hlam_cont after interpolation.")
+    println("   These will be saved as NaN — check the raw SYNSPEC output for this model.")
+end
 println("   ✓ JLD2 saved.")
 
 cd("..")

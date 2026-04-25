@@ -32,7 +32,7 @@ echo " TLUSTY     : $TLUSTY"
 echo " Neighbor   : $(sed -n "${ROW}p" retry-neighbors.dat)"
 echo "============================================================"
 
-/share/apps/sistema/julia-1.8/bin/julia run_retry.jl "$ROW"
+julia run_retry.jl "$ROW"
 EXIT_CODE=$?
 
 echo "============================================================"

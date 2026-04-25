@@ -24,6 +24,8 @@ using JLD2
 # ==============================================================================
 # GRID METALLICITY — keep in sync with run_model_fe.jl
 # ==============================================================================
+# Keep in sync with run_model.jl
+const COMPOSITION = "SiFe"   # "H", "HHe", "HHeCNO", or "SiFe"
 const Z_SOLAR = 1.0
 
 const SOLAR_ABUND = Dict(
@@ -451,23 +453,26 @@ cp(nb_model, "mod_lt.7", force=true)
 println("   ✓ Starting from neighbor: $nb_dir/mod_nl.7")
 
 # Step 1: NLTE continuum CNO — start directly from neighbor structure
-println("\n>> [1/3] NLTE continuum CNO...")
+println("\n>> [1] NLTE continuum...")
 clean_data_link()
 run(`bash -c "$rtlusty_cmd mod_nc mod_lt"`)
 check_output("mod_nc")
 check_nan("mod_nc")
 
-# Step 2: NLTE continuum + Fe
-println("\n>> [2/3] NLTE continuum Si+S+Fe...")
-clean_data_link()
-run(`bash -c "$rtlusty_cmd mod_nc_fe mod_nc"`)
-check_output("mod_nc_fe")
-check_nan("mod_nc_fe")
+if COMPOSITION == "SiFe"
+    println("\n>> [2] NLTE continuum Si+S+Fe...")
+    clean_data_link()
+    run(`bash -c "$rtlusty_cmd mod_nc_fe mod_nc"`)
+    check_output("mod_nc_fe")
+    check_nan("mod_nc_fe")
+    prev_nl = "mod_nc_fe"
+else
+    prev_nl = "mod_nc"
+end
 
-# Step 3: NLTE full lines
-println("\n>> [3/3] NLTE full lines...")
+println("\n>> NLTE full lines...")
 clean_data_link()
-run(`bash -c "$rtlusty_cmd mod_nl mod_nc_fe"`)
+run(`bash -c "$rtlusty_cmd mod_nl $prev_nl"`)
 clean_data_link()
 check_output("mod_nl")
 check_nan("mod_nl")
@@ -541,6 +546,20 @@ if length(all_lam_s) < 10000
     exit(1)
 end
 
+# Filter NaN and negative values before interpolation
+function clean_spectrum(lam, hlam, label)
+    valid = isfinite.(hlam) .& (hlam .> 0)
+    n_bad = count(.!valid)
+    if n_bad > 0
+        pct = round(100 * n_bad / length(hlam), digits=2)
+        println("   WARNING: $n_bad invalid points ($pct%) removed from $label.")
+    end
+    return lam[valid], hlam[valid]
+end
+
+all_lam_s, all_hlam_s = clean_spectrum(all_lam_s, all_hlam_s, "hlam_spec")
+all_lam_c, all_hlam_c = clean_spectrum(all_lam_c, all_hlam_c, "hlam_cont")
+
 println("\nSaving JLD2...")
 lam_s  = all_lam_s;  hlam_s = all_hlam_s
 lam_c  = all_lam_c;  hlam_c = all_hlam_c
@@ -551,15 +570,27 @@ interp(lam, hlam, λ) = let idx = searchsortedfirst(lam, λ)
     idx == 1 ? hlam[1] : idx > length(lam) ? hlam[end] :
     hlam[idx-1] + (hlam[idx]-hlam[idx-1])*(λ-lam[idx-1])/(lam[idx]-lam[idx-1])
 end
+
+hlam_s_out = Float32.([interp(lam_s, hlam_s, λ) for λ in lam_grid])
+hlam_c_out = Float32.([interp(lam_c, hlam_c, λ) for λ in lam_grid])
+
+# Check for NaN after interpolation
+n_nan_s = count(isnan, hlam_s_out)
+n_nan_c = count(isnan, hlam_c_out)
+(n_nan_s > 0 || n_nan_c > 0) &&
+    println("   WARNING: $n_nan_s NaN in hlam_spec, $n_nan_c in hlam_cont after interpolation.")
+
 jldsave("mod_sp.jld2"; compress=true,
-    lam       = Float32.(lam_grid),
-    hlam_spec = Float32.([interp(lam_s, hlam_s, λ) for λ in lam_grid]),
-    hlam_cont = Float32.([interp(lam_c, hlam_c, λ) for λ in lam_grid]),
-    teff      = Float32(teff),
-    logg      = Float32(logg),
-    vtb       = Float32(vtb_val),
-    star_type = star_type,
-    step_ang  = Float32(step_out)
+    lam         = Float32.(lam_grid),
+    hlam_spec   = hlam_s_out,
+    hlam_cont   = hlam_c_out,
+    teff        = Float32(teff),
+    logg        = Float32(logg),
+    Z           = Float32(Z_SOLAR),
+    composition = COMPOSITION,
+    vtb         = Float32(vtb_val),
+    star_type   = star_type,
+    step_ang    = Float32(step_out)
 )
 println("   ✓ JLD2 saved.")
 
