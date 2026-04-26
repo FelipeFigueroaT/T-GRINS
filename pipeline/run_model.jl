@@ -85,24 +85,24 @@ function parse_args(args)
     end
 
     if config_file !== nothing
-        return :config, config_file, nothing, nothing, nothing
+        return :config, config_file, "tlusty-input.dat", nothing, nothing, nothing
     elseif teff_arg !== nothing && logg_arg !== nothing
-        return :quick, nothing, nothing, teff_arg, logg_arg
+        return :quick, nothing, "tlusty-input.dat", nothing, teff_arg, logg_arg
     elseif line_idx !== nothing
-        return :grid, grid_file, line_idx, nothing, nothing
+        return :grid, nothing, grid_file, line_idx, nothing, nothing
     else
         println("""
 Usage:
-  Grid mode  : julia run_model_fe.jl -g tlusty-input.dat -l 3
-  Config mode: julia run_model_fe.jl -c config.toml
-  Quick mode : julia run_model_fe.jl -t 35000 -G 4.0
-  Legacy     : julia run_model_fe.jl 3
+  Grid mode  : julia run_model.jl -g tlusty-input.dat -l 3
+  Config mode: julia run_model.jl -c config.toml
+  Quick mode : julia run_model.jl -t 35000 -G 4.0
+  Legacy     : julia run_model.jl 3
 """)
         exit(1)
     end
 end
 
-mode, config_file, line_idx, teff_arg, logg_arg = parse_args(ARGS)
+mode, config_file, grid_file, line_idx, teff_arg, logg_arg = parse_args(ARGS)
 
 # ==============================================================================
 # DEFAULT PARAMETERS (overridden by config or CLI)
@@ -315,12 +315,12 @@ function atom_header(nfreq, natoms)
     0   0.            0     ! B
     2   $(rpad(abn[:c], 10))0     ! C
     2   $(rpad(abn[:n], 10))0     ! N
-    2   $(rpad(abn[:o], 10))0     ! O"""
+    2   $(rpad(abn[:o], 10))0     ! O
+"""
     if natoms == 8
-        return lines * "\n*\n*iat   iz   nlevs  ilast ilvlin  nonstd typion  filei\n*"
+        return lines * "*\n*iat   iz   nlevs  ilast ilvlin  nonstd typion  filei\n*"
     else
-        return lines * """
-    0   0.            0     ! F
+        return lines * """    0   0.            0     ! F
     1   $(rpad(abn[:ne],10))0     ! Ne
     1   $(rpad(abn[:na],10))0     ! Na
     1   $(rpad(abn[:mg],10))0     ! Mg
@@ -591,7 +591,10 @@ elseif is_ostar
         (900.0, -50000.0, 1.0e-4),   # UV-optical-IR: standard relop
     ]
 else
-    segments = [(500.0, -50000.0, 1.0e-4)]
+    segments = [
+        (50.0,  -500.0,   1.0e-2),   # EUV
+        (500.0, -50000.0, 1.0e-4),   # UV-optical-IR
+    ]
 end
 
 # ==============================================================================
@@ -710,7 +713,7 @@ else
     prev_nl = name_nc
 end
 
-println("\n>> NLTE full lines — final converged model...")
+println("\n>> [$(composition == "SiFe" ? 4 : 3)] NLTE full lines — final converged model...")
 clean_data_link()
 run(`bash -c "$rtlusty_cmd $name_nl $prev_nl"`)
 clean_data_link()
@@ -719,7 +722,12 @@ check_output(name_nl); check_nan(name_nl)
 # ==============================================================================
 # SYNSPEC — MULTI-SEGMENT
 # ==============================================================================
-println("\n>> [5/5] SYNSPEC...")
+n_steps = composition == "SiFe" ? 5 : 4
+println("\n>> [$n_steps] SYNSPEC...")
+
+# ==============================================================================
+# SYNSPEC — MULTI-SEGMENT
+# ==============================================================================
 clean_data_link()
 cp("$name_nl.7", "$name_sp.7", force=true)
 
@@ -729,6 +737,10 @@ all_lam_c = Float64[]; all_hlam_c = Float64[]
 for (iseg, (afirst, alast, relop)) in enumerate(segments)
     println("  Segment $iseg/$(length(segments)): $(afirst)–$(abs(alast)) Å (relop=$(relop))...")
     write_fort55(afirst, alast, relop)
+
+    # Remove any leftover spec/cont before calling SYNSPEC
+    rm("$name_sp.spec", force=true)
+    rm("$name_sp.cont", force=true)
 
     synspec_call = isempty(linelist_file) ?
         "$rsynspec_cmd $name_sp synspec.55" :
