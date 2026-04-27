@@ -72,9 +72,14 @@ logg      = Float64(inp[row_idx, 2])
 teff_nb   = Float64(nbr[row_idx, 1])
 logg_nb   = Float64(nbr[row_idx, 2])
 
-dir_name  = "model_$(@sprintf("%.0f_%.0f", teff,    logg    * 100))"
-nb_dir    = "model_$(@sprintf("%.0f_%.0f", teff_nb, logg_nb * 100))"
-nb_model  = abspath(joinpath(nb_dir, "mod_nl.7"))  # absolute path before any cd
+function make_dir_name(t, g)
+    base = "model_$(@sprintf("%.0f_%.0f", t, g * 100))"
+    COMPOSITION == "SiFe" ? base : base * "_$(COMPOSITION)"
+end
+
+dir_name = make_dir_name(teff,    logg)
+nb_dir   = make_dir_name(teff_nb, logg_nb)
+nb_model = abspath(joinpath(nb_dir, "mod_nl.7"))  # absolute path before any cd
 
 println("="^60)
 println(" RETRY: Teff=$teff K, logg=$logg")
