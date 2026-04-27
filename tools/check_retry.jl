@@ -13,6 +13,15 @@ using Printf
 
 input_file = "retry-input.dat"
 
+# Keep in sync with run_model.jl
+# "H", "HHe", "HHeCNO", or "SiFe"
+const COMPOSITION = "SiFe"
+
+function dir_name(t, g)
+    base = "model_$(@sprintf("%.0f_%.0f", t, g * 100))"
+    COMPOSITION == "SiFe" ? base : base * "_$(COMPOSITION)"
+end
+
 if !isfile(input_file)
     println("Error: '$input_file' not found. Run make_retry_list.jl first.")
     exit(1)
@@ -20,8 +29,6 @@ end
 
 data = readdlm(input_file)
 models = [(Float64(data[i,1]), Float64(data[i,2])) for i in 1:size(data,1)]
-
-dir_name(t, g) = "model_$(@sprintf("%.0f_%.0f", t, g * 100))"
 
 succeeded = []
 failed    = []
