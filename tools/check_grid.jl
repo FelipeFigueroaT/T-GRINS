@@ -19,6 +19,15 @@ using JLD2
 input_file = "--input" in ARGS ?
     ARGS[findfirst(==("--input"), ARGS) + 1] : "tlusty-input.dat"
 
+# Keep in sync with run_model.jl
+# "H", "HHe", "HHeCNO", or "SiFe"
+const COMPOSITION = "SiFe"
+
+function dir_name(t, g)
+    base = "model_$(@sprintf("%.0f_%.0f", t, g * 100))"
+    COMPOSITION == "SiFe" ? base : base * "_$(COMPOSITION)"
+end
+
 if !isfile(input_file)
     println("Error: '$input_file' not found.")
     exit(1)
@@ -27,7 +36,6 @@ end
 data   = readdlm(input_file)
 models = [(Float64(data[i,1]), Float64(data[i,2])) for i in 1:size(data,1)]
 
-dir_name(t, g) = "model_$(@sprintf("%.0f_%.0f", t, g * 100))"
 jld2_path(t, g) = joinpath(dir_name(t, g), "mod_sp.jld2")
 
 # Thresholds
