@@ -23,6 +23,14 @@ using Printf
 input_file = "--input" in ARGS ?
     ARGS[findfirst(==("--input"), ARGS) + 1] : "tlusty-input.dat"
 
+# Keep in sync with run_model.jl
+const COMPOSITION = "SiFe"   # "H", "HHe", "HHeCNO", or "SiFe"
+
+function dir_name(t, g)
+    base = "model_$(@sprintf("%.0f_%.0f", t, g * 100))"
+    COMPOSITION == "SiFe" ? base : base * "_$(COMPOSITION)"
+end
+
 if !isfile(input_file)
     println("Error: '$input_file' not found.")
     exit(1)
@@ -31,7 +39,6 @@ end
 data       = readdlm(input_file)
 all_models = [(Float64(data[i,1]), Float64(data[i,2])) for i in 1:size(data,1)]
 
-dir_name(t, g) = "model_$(@sprintf("%.0f_%.0f", t, g * 100))"
 is_converged(t, g) = isfile(joinpath(dir_name(t,g), "mod_sp.jld2"))
 
 failed    = [(t,g) for (t,g) in all_models if !is_converged(t,g)]
@@ -130,5 +137,5 @@ println("Written: retry-input.dat ($(length(plan)) rows)")
 println("Written: retry-neighbors.dat ($(length(plan)) rows)")
 println()
 println("Next steps:")
-println("  1. Edit retry_grid.sub → set 'queue $(length(plan))'")
-println("  2. condor_submit retry_grid.sub")
+println("  1. Edit retry_grid.submit → set 'queue $(length(plan))'")
+println("  2. condor_submit retry_grid.submit")
